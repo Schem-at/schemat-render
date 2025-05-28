@@ -1,0 +1,21 @@
+version: '3.8'
+services:
+  schemat-render:
+    build: 
+      context: .
+      target: runtime
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  # Optional: Add database if needed later
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
