@@ -38,7 +38,7 @@ router.post(
 			res.set("Content-Type", "image/png");
 			res.set("Content-Disposition", `attachment; filename="${filename}"`);
 			res.send(pngBuffer);
-		} catch (error) {
+		} catch (error: any) {
 			logger.error("Schematic render error:", error);
 			res
 				.status(500)

@@ -126,7 +126,7 @@ async function renderSchematicAttachment(message: any, attachment: any) {
 		logger.info(
 			`Successfully rendered ${attachment.name} in ${processingTime}s`
 		);
-	} catch (error) {
+	} catch (error: any) {
 		logger.error(`Failed to render schematic ${attachment.name}:`, error);
 
 		// Replace loading reaction with error

@@ -5,7 +5,7 @@
 	"main": "dist/app.js",
 	"type": "module",
 	"scripts": {
-		"setup-libs": "cd libs && ls *.tgz | head -1 | xargs -I {} tar -xzf {} && mv package schematic-renderer && mkdir -p ../node_modules && cp -r schematic-renderer ../node_modules/ && mkdir -p ../frontend/node_modules && cp -r schematic-renderer ../frontend/node_modules/",
+		"setup-libs": "cd libs && rm -rf schematic-renderer && rm -rf ../node_modules/schematic-renderer && rm -rf ../frontend/node_modules/schematic-renderer && ls *.tgz | head -1 | xargs -I {} tar -xzf {} && mv package schematic-renderer && mkdir -p ../node_modules && cp -r schematic-renderer ../node_modules/ && mkdir -p ../frontend/node_modules && cp -r schematic-renderer ../frontend/node_modules/",
 		"clean-libs": "rm -rf libs/schematic-renderer node_modules/schematic-renderer frontend/node_modules/schematic-renderer",
 		"build:frontend": "cd frontend && bun run build && cp -r dist ../dist-frontend",
 		"build:backend": "bun run setup-libs && tsc",
@@ -23,7 +23,7 @@
 		"helmet": "^7.1.0",
 		"morgan": "^1.10.0",
 		"multer": "^1.4.5-lts.1",
-		"puppeteer": "^24.9.0",
+		"puppeteer": "^24.10.0",
 		"three": "^0.176.0"
 	},
 	"devDependencies": {

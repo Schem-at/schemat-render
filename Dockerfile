@@ -1,10 +1,35 @@
-# Multi-stage build for production
+# Multi-stage build - automatically handles schematic-renderer
 FROM oven/bun:1 AS deps
 WORKDIR /app
-COPY package.json bun.lockb ./
-COPY frontend/package.json ./frontend/
-RUN cd frontend && bun install --frozen-lockfile
-RUN bun install --frozen-lockfile
+
+# Set Puppeteer environment variables BEFORE installing
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_CACHE_DIR=/tmp/.puppeteer
+
+# Copy package files
+COPY package.json ./
+COPY frontend/package.json ./frontend/package.json.orig
+COPY libs/*.tgz ./libs/
+
+# Remove lock files to avoid conflicts
+RUN rm -f bun.lockb frontend/bun.lockb
+
+# Extract the custom library
+RUN cd libs && \
+    ls *.tgz | head -1 | xargs -I {} tar -xzf {} && \
+    mv package schematic-renderer
+
+# Automatically remove the file: reference from frontend package.json
+RUN sed '/schematic-renderer.*file:/d' frontend/package.json.orig > frontend/package.json
+
+# Install dependencies WITHOUT running any postinstall scripts
+RUN cd frontend && bun install --ignore-scripts
+RUN bun install --ignore-scripts
+
+# Copy the library manually after installation
+RUN mkdir -p frontend/node_modules node_modules && \
+    cp -r libs/schematic-renderer frontend/node_modules/ && \
+    cp -r libs/schematic-renderer node_modules/
 
 FROM oven/bun:1 AS frontend-builder
 WORKDIR /app
@@ -17,31 +42,38 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 COPY --from=frontend-builder /app/frontend/dist ./dist-frontend
-RUN bun run build:backend
+RUN bunx tsc
 
 FROM node:18-slim AS runtime
-# Install Chromium dependencies
-RUN apt-get update && apt-get install -y \
-    chromium \
-    fonts-liberation \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libdrm2 \
-    libgtk-3-0 \
-    libgtk-4-1 \
-    libu2f-udev \
-    libvulkan1 \
-    xdg-utils \
-    && rm -rf /var/lib/apt/lists/*
 
-# Set Puppeteer to use installed Chromium
+RUN apt-get update && apt-get install -y \
+    chromium fonts-liberation libasound2 libatk-bridge2.0-0 \
+    libdrm2 libgtk-3-0 libgtk-4-1 libu2f-udev libvulkan1 \
+    xdg-utils curl && rm -rf /var/lib/apt/lists/*
+
+# Use the existing node user instead of creating new one
+
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV NODE_ENV=production
 
 WORKDIR /app
-COPY --from=backend-builder /app/dist ./dist
-COPY --from=backend-builder /app/dist-frontend ./dist-frontend
-COPY --from=backend-builder /app/node_modules ./node_modules
-COPY --from=backend-builder /app/package.json ./
 
+COPY --from=backend-builder --chown=node:node /app/dist ./dist
+COPY --from=backend-builder --chown=node:node /app/dist-frontend ./dist-frontend
+COPY --from=backend-builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=backend-builder --chown=node:node /app/package.json ./
+
+# Copy the startup script
+COPY --chown=node:node start.sh ./start.sh
+RUN chmod +x start.sh
+
+RUN mkdir -p /app/uploads /app/logs && chown -R node:node /app
+
+USER node
 EXPOSE 3000
-CMD ["node", "dist/app.js"]
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+CMD ["./start.sh"]

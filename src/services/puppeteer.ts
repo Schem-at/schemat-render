@@ -8,6 +8,8 @@ let initializationPromise: Promise<void> | null = null;
 const MAX_PAGES = parseInt(process.env.MAX_CONCURRENT_RENDERS || "3");
 const FRONTEND_URL = "http://localhost:3000";
 
+// tell TypeScript that window.schematicRendererInitialized, THREE, and window.schematicHelpers are defined
+
 export async function initPuppeteerService(): Promise<void> {
 	// Return existing initialization if already in progress
 	if (initializationPromise) {
@@ -19,14 +21,19 @@ export async function initPuppeteerService(): Promise<void> {
 			logger.info("🚀 Launching Puppeteer browser...");
 
 			browser = await puppeteer.launch({
-				headless: "new",
+				// @ts-ignore
+				headless: "new", // Use the new headless mode for better performance
+				timeout: 60_000,
 				args: [
 					"--no-sandbox",
 					"--disable-setuid-sandbox",
 					"--disable-dev-shm-usage",
-					"--disable-web-security",
-					"--allow-file-access-from-files",
-					"--max-old-space-size=4096",
+					"--disable-accelerated-2d-canvas",
+					"--no-first-run",
+					"--disable-audio-output",
+					"--disable-background-timer-throttling",
+					"--disable-backgrounding-occluded-windows",
+					"--disable-renderer-backgrounding",
 				],
 			});
 
@@ -37,11 +44,16 @@ export async function initPuppeteerService(): Promise<void> {
 
 			isInitialized = true;
 			logger.info("✅ Puppeteer service fully initialized");
-		} catch (error) {
-			logger.error("Failed to initialize Puppeteer:", error);
-			isInitialized = false;
-			throw error;
-		}
+		} catch (error: any) {
+    console.error("Failed to initialize Puppeteer:");
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
+    console.error("Full error:", error);
+    
+    logger.error("Failed to initialize Puppeteer:", error.message || error);
+    isInitialized = false;
+    throw error;
+}
 	})();
 
 	return initializationPromise;
@@ -58,8 +70,8 @@ async function initializePagePool(): Promise<void> {
 		try {
 			const testPage = await browser!.newPage();
 			await testPage.goto(FRONTEND_URL, {
-				waitUntil: "networkidle0",
-				timeout: 10000,
+				waitUntil: "domcontentloaded",
+				timeout: 30000,
 			});
 
 			// Check if the basic page loads
@@ -67,7 +79,7 @@ async function initializePagePool(): Promise<void> {
 			logger.info(`✅ React app accessible, title: ${title}`);
 
 			await testPage.close();
-		} catch (error) {
+		} catch (error: any) {
 			logger.error(
 				`❌ React app not accessible at ${FRONTEND_URL}:`,
 				error.message
@@ -86,7 +98,7 @@ async function initializePagePool(): Promise<void> {
 				pagePool.push(page);
 				successCount++;
 				logger.info(`✅ Created page ${i + 1}/${MAX_PAGES}`);
-			} catch (error) {
+			} catch (error: any) {
 				logger.error(`❌ Failed to create page ${i + 1}:`, error.message);
 				// Continue trying to create more pages
 			}
@@ -102,7 +114,7 @@ async function initializePagePool(): Promise<void> {
 				"⚠️ No pages initialized successfully - service will have degraded functionality"
 			);
 		}
-	} catch (error) {
+	} catch (error: any) {
 		logger.error("❌ Failed to initialize page pool:", error.message);
 		throw error;
 	}
@@ -131,7 +143,7 @@ async function createSchematicPage(): Promise<Page> {
 		logger.info(`Loading React app: ${FRONTEND_URL}`);
 
 		await page.goto(FRONTEND_URL, {
-			waitUntil: "networkidle0",
+			waitUntil: "domcontentloaded",
 			timeout: 30000,
 		});
 
@@ -219,7 +231,7 @@ async function createSchematicPage(): Promise<Page> {
 				};
 			});
 			logger.info("Debug info:", debugInfo);
-		} catch (debugError) {
+		} catch (debugError: any) {
 			logger.info("Could not get debug info:", debugError.message);
 		}
 

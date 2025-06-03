@@ -1,6 +1,8 @@
 import "./App.css";
 import { SchematicRenderer } from "schematic-renderer";
-import { useRef, useEffect, useState } from "react"; // Removed React import
+import { useRef, useEffect, useState } from "react";
+import * as THREE from "three";
+(window as any).THREE = THREE;
 
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
 	const binaryString = atob(base64);
@@ -208,9 +210,13 @@ export function App() {
 			},
 
 			waitForReady: (): Promise<boolean> => {
+				console.log("waitForReady called");
 				return new Promise((resolve) => {
 					const check = () => {
-						if (window.schematicHelpers?.isReady()) {
+						const ready = window.schematicHelpers?.isReady();
+						console.log("waitForReady check:", ready);
+						if (ready) {
+							console.log("waitForReady resolving!");
 							resolve(true);
 						} else {
 							setTimeout(check, 100);

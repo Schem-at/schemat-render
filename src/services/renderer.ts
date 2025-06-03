@@ -2,6 +2,23 @@ import { getPage, releasePage, waitForPuppeteerReady } from "./puppeteer.js";
 import { RenderOptions } from "../shared/types.js";
 import { logger } from "../shared/logger.js";
 
+declare global {
+	interface Window {
+		schematicRendererInitialized: boolean;
+		THREE: any;
+		schematicHelpers: {
+			waitForReady: () => Promise<void>;
+			isReady: () => boolean;
+			loadSchematic: (id: string, data: string) => Promise<void>;
+			takeScreenshot: (options: {
+				width: number;
+				height: number;
+				format: "image/png" | "image/jpeg";
+			}) => Promise<Blob>;
+		};
+	}
+}
+
 export async function renderSchematic(
 	schematicData: Buffer,
 	options: RenderOptions = {}
@@ -19,26 +36,50 @@ export async function renderSchematic(
 		// Convert buffer to base64 for easier transmission
 		const base64Data = schematicData.toString("base64");
 
-		// Load schematic (no waiting needed - page is pre-initialized)
-		const loadSuccess = await page.evaluate(async (data) => {
+		// Setup event listener BEFORE loading schematic and wait for completion
+		logger.info("Waiting for schematic render to complete...");
+		const renderData: any = await page.evaluate(async (data) => {
+			// Setup event listener FIRST
+			const renderPromise = new Promise((resolve, reject) => {
+				const timeout = setTimeout(() => {
+					reject(new Error("Schematic render timeout after 30 seconds"));
+				}, 30000);
+
+				window.addEventListener(
+					"schematicRenderComplete",
+					(event: any) => {
+						clearTimeout(timeout);
+						console.log("🎉 Puppeteer caught render complete event:", event.detail);
+						resolve(event.detail);
+					},
+					{ once: true }
+				);
+			});
+
+			// THEN load schematic (will trigger the event)
 			try {
 				await window.schematicHelpers.loadSchematic("api-schematic", data);
-				return true;
-			} catch (error) {
+				console.log("✅ Schematic loading initiated");
+			} catch (error: any) {
 				console.error("Failed to load schematic:", error.message || error);
-				return false;
+				throw error;
 			}
+
+			// Wait for the render complete event
+			return renderPromise;
 		}, base64Data);
 
-		if (!loadSuccess) {
-			throw new Error("Failed to load schematic in renderer");
-		}
-
-		// Wait for rendering to complete
-		await new Promise((resolve) => setTimeout(resolve, 500));
+		logger.info(
+			`Schematic rendered successfully: ${renderData.meshCount} meshes in ${renderData.buildTimeMs}ms`
+		);
 
 		// Take screenshot
 		const screenshotBlob = await page.evaluate(async (opts) => {
+			if (window.schematicHelpers == undefined) {
+				throw new Error("Schematic helpers not initialized");
+			}
+			console.log("Taking screenshot with options:", JSON.stringify(opts, null, 2));
+			
 			const blob = await window.schematicHelpers.takeScreenshot({
 				width: opts.width || 1920,
 				height: opts.height || 1080,

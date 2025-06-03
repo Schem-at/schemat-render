@@ -1,13 +1,61 @@
+# Dependencies
 node_modules
-.git
-.env
-*.log
-dist
-frontend/dist
 frontend/node_modules
-.DS_Store
-*.md
+
+# Extracted libs (we only want the .tgz files)
+libs/schematic-renderer
+
+# Build outputs
+dist
+dist-frontend
+frontend/dist
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Uploads
+uploads
+
+# Git
+.git
+.gitignore
+
+# IDE
 .vscode
 .idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+docker-compose*.yml
+Dockerfile*
+
+# Documentation
+README.md
+*.md
+
+# Cache
+.cache
+.npm
+.yarn
+
+# Testing
+test
+tests
+__tests__
 coverage
-.nyc_output

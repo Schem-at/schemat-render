@@ -1,19 +1,42 @@
 version: '3.8'
+
 services:
   schemat-render:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    image: schemat-render:latest
+    container_name: schemat-render
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - MAX_CONCURRENT_RENDERS=3
+      - PORT=3000
+      - DISCORD_TOKEN=${DISCORD_TOKEN:-}
+      - MAX_CONCURRENT_RENDERS=${MAX_CONCURRENT_RENDERS:-3}
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+      - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
+    # Required for Puppeteer/Chromium
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
+    # Alternative to SYS_ADMIN (uncomment if you prefer)
+    # environment:
+    #   - PUPPETEER_ARGS=--no-sandbox --disable-setuid-sandbox
+    networks:
+      - schemat-network
+
+networks:
+  schemat-network:
+    driver: bridge
