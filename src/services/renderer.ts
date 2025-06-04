@@ -42,8 +42,8 @@ export async function renderSchematic(
 			// Setup event listener FIRST
 			const renderPromise = new Promise((resolve, reject) => {
 				const timeout = setTimeout(() => {
-					reject(new Error("Schematic render timeout after 30 seconds"));
-				}, 30000);
+					reject(new Error("Schematic render timeout after 120 seconds"));
+				}, 120000);
 
 				window.addEventListener(
 					"schematicRenderComplete",
