@@ -3,6 +3,10 @@ import { SchematicRenderer } from "schematic-renderer";
 import { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
 (window as any).THREE = THREE;
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { toBlobURL } from "@ffmpeg/util";
+
+const ffmpeg = new FFmpeg();
 
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
 	const binaryString = atob(base64);
@@ -23,6 +27,12 @@ declare global {
 				name: string,
 				data: string | ArrayBuffer
 			) => Promise<void>;
+			startVideoRecording: (options?: {
+				duration?: number;
+				width?: number;
+				height?: number;
+				frameRate?: number;
+			}) => Promise<Blob>;
 			takeScreenshot: (options?: any) => Promise<Blob>;
 			isReady: () => boolean;
 			waitForReady: () => Promise<boolean>;
@@ -39,9 +49,38 @@ export function App() {
 		"initializing"
 	);
 	const [currentSchematic, setCurrentSchematic] = useState<string>("none");
+	const [ffmpegReady, setFFmpegReady] = useState(false); // Add this
+
 
 	useEffect(() => {
-		let mounted = true;
+		const initFFmpegAsync = async () => {
+			try {
+				console.log("🎬 Loading FFmpeg...");
+
+				// Use single-threaded version (no -mt suffix)
+				const baseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm";
+
+				await ffmpeg.load({
+					coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+					wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+					// No workerURL needed for single-threaded version
+				});
+
+				console.log("✅ FFmpeg loaded successfully");
+				setFFmpegReady(true);
+			} catch (error) {
+				console.error("❌ Failed to load FFmpeg:", error);
+				setFFmpegReady(false);
+			}
+		};
+
+		initFFmpegAsync();
+	}, []);
+
+	useEffect(() => {
+		if (!ffmpegReady) return; // Wait for FFmpeg first!
+
+		let mounted = true; // Add this variable
 
 		const init = async () => {
 			if (!canvasRef.current) return;
@@ -62,6 +101,10 @@ export function App() {
 					throw new Error(`Missing pack.zip file: ${packError.message}`);
 				}
 
+				if (ffmpeg && !ffmpeg.loaded) {
+					console.warn("FFmpeg instance exists but is not loaded yet");
+				}
+
 				const renderer = new SchematicRenderer(
 					canvasRef.current,
 					{},
@@ -78,6 +121,7 @@ export function App() {
 						},
 					},
 					{
+						ffmpeg: ffmpeg,
 						enableDragAndDrop: true,
 						callbacks: {
 							onRendererInitialized: async (
@@ -155,6 +199,58 @@ export function App() {
 					}
 				});
 			},
+			startVideoRecording: async (options = {}): Promise<Blob> => {
+				if (!rendererRef.current?.cameraManager?.recordingManager) {
+					throw new Error("Recording manager not available");
+				}
+
+				console.log("Starting video recording with options:", options);
+
+				const defaultOptions = {
+					duration: 4,
+					width: 1920,
+					height: 1080,
+					frameRate: 24,
+				};
+
+				const recordingOptions = { ...defaultOptions, ...options };
+
+				try {
+					// Set up circular path around schematic
+					rendererRef.current.cameraManager.cameraPathManager.fitCircularPathToSchematics(
+						"circularPath"
+					);
+
+					// Hide UI elements during recording
+					rendererRef.current.cameraManager.cameraPathManager.hidePathVisualization(
+						"circularPath"
+					);
+
+					// Return promise that resolves with the video blob
+					const videoBlob = await new Promise<Blob>((resolve, reject) => {
+						rendererRef.current!.cameraManager.recordingManager
+							.startRecording(recordingOptions.duration, {
+								width: recordingOptions.width,
+								height: recordingOptions.height,
+								frameRate: recordingOptions.frameRate,
+								onProgress: (progress) => {
+									console.log(`Recording progress: ${progress}%`);
+								},
+								onComplete: (blob) => {
+									console.log("✅ Video recording completed");
+									resolve(blob);
+								},
+							})
+							.catch(reject);
+					});
+
+					return videoBlob;
+				} catch (error) {
+					console.error("❌ Video recording failed:", error);
+					throw error;
+				}
+			},
+
 
 			takeScreenshot: async (options = {}): Promise<Blob> => {
 				if (!rendererRef.current?.cameraManager?.recordingManager) {
@@ -244,7 +340,7 @@ export function App() {
 			}
 			window.schematicRendererInitialized = false;
 		};
-	}, []);
+	}, [ffmpegReady]);
 
 	// Status indicator component
 	const StatusIndicator = () => {
@@ -286,7 +382,7 @@ export function App() {
 	};
 
 	return (
-		<div className="bg-gray-900 h-screen w-screen flex items-center justify-center relative overflow-hidden">
+		<div className="bg-gray-900 h-screen w-screen flex items-center justify-center relative overflow-hidden max-h-100vh">
 			<StatusIndicator />
 
 			{import.meta.env.DEV && (
@@ -315,7 +411,7 @@ export function App() {
 				id="canvas"
 				width={1920}
 				height={1080}
-				className="max-w-full max-h-full object-contain"
+				className="max-w-full max-h-full object-contain max-h-100vh"
 				style={{
 					display: status === "error" ? "none" : "block",
 					background: "transparent",

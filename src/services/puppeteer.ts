@@ -162,17 +162,20 @@ async function createSchematicPage(): Promise<Page> {
 
 		// Wait for the React app's global helpers to be ready
 		await page.waitForFunction(
-			() => {
-				return (
-					window.schematicHelpers &&
-					typeof window.schematicHelpers.waitForReady === "function"
-				);
-			},
-			{
-				timeout: 15000,
-				polling: 500,
-			}
+	() => {
+		return (
+			window.schematicHelpers &&
+			typeof window.schematicHelpers.waitForReady === "function" &&
+			typeof window.schematicHelpers.startVideoRecording === "function" && 
+			typeof window.schematicHelpers.takeScreenshot === "function" &&
+			typeof window.schematicHelpers.loadSchematic === "function"
 		);
+	},
+	{
+		timeout: 15000,
+		polling: 500,
+	}
+);
 
 		logger.info("✅ Schematic helpers found!");
 

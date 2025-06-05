@@ -10,10 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
+    "cubane": "^1.0.13",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "schematic-renderer": "file:../libs/schematic-renderer",
-    "cubane": "^1.0.13",
     "three": "^0.176.0"
   },
   "devDependencies": {

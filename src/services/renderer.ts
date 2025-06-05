@@ -1,5 +1,5 @@
 import { getPage, releasePage, waitForPuppeteerReady } from "./puppeteer.js";
-import { RenderOptions } from "../shared/types.js";
+import { RenderOptions, VideoRenderOptions } from "../shared/types.js";
 import { logger } from "../shared/logger.js";
 
 declare global {
@@ -14,6 +14,12 @@ declare global {
 				width: number;
 				height: number;
 				format: "image/png" | "image/jpeg";
+			}) => Promise<Blob>;
+			startVideoRecording: (options?: {  
+				duration?: number;
+				width?: number;
+				height?: number;
+				frameRate?: number;
 			}) => Promise<Blob>;
 		};
 	}
@@ -93,6 +99,81 @@ export async function renderSchematic(
 		return Buffer.from(screenshotBlob);
 	} catch (error) {
 		logger.error("Error in renderSchematic:", error);
+		throw error;
+	} finally {
+		if (page) await releasePage(page);
+	}
+}
+
+
+export async function renderSchematicVideo(
+	schematicData: Buffer,
+	options: VideoRenderOptions = {}
+): Promise<Buffer> {
+	let page = null;
+
+	try {
+		await waitForPuppeteerReady();
+		page = await getPage();
+
+		logger.info(`Rendering schematic video, size: ${schematicData.length} bytes`);
+
+		const base64Data = schematicData.toString("base64");
+
+		// Load schematic and wait for completion
+		logger.info("Loading schematic for video recording...");
+		const renderData: any = await page.evaluate(async (data) => {
+			const renderPromise = new Promise((resolve, reject) => {
+				const timeout = setTimeout(() => {
+					reject(new Error("Schematic render timeout after 120 seconds"));
+				}, 120000);
+
+				window.addEventListener(
+					"schematicRenderComplete",
+					(event: any) => {
+						clearTimeout(timeout);
+						console.log("🎉 Schematic loaded for video:", event.detail);
+						resolve(event.detail);
+					},
+					{ once: true }
+				);
+			});
+
+			try {
+				await window.schematicHelpers.loadSchematic("api-schematic", data);
+			} catch (error: any) {
+				throw error;
+			}
+
+			return renderPromise;
+		}, base64Data);
+
+		logger.info(`Schematic loaded, starting video recording...`);
+
+		// Record video
+		const videoBlob = await page.evaluate(async (opts) => {
+			if (!window.schematicHelpers?.startVideoRecording) {
+				throw new Error("Video recording not available - startVideoRecording function missing");
+			}
+
+			console.log("Starting video recording with options:", JSON.stringify(opts, null, 2));
+			
+			const blob = await window.schematicHelpers.startVideoRecording({
+				duration: opts.duration || 6,
+				width: opts.width || 1920,
+				height: opts.height || 1080,
+				frameRate: opts.frameRate || 30,
+			});
+
+			const arrayBuffer = await blob.arrayBuffer();
+			return Array.from(new Uint8Array(arrayBuffer));
+		}, options);
+
+		logger.info("Video recording completed successfully");
+		return Buffer.from(videoBlob);
+
+	} catch (error) {
+		logger.error("Error in renderSchematicVideo:", error);
 		throw error;
 	} finally {
 		if (page) await releasePage(page);

@@ -10,5 +10,13 @@ export interface Window {
 			height: number;
 			format: "image/png" | "image/jpeg";
 		}) => Promise<Blob>;
+		startVideoRecording: (options?: {
+				duration?: number;
+				width?: number;
+				height?: number;
+				frameRate?: number;
+			}) => Promise<Blob>;
 	};
 }
+
+

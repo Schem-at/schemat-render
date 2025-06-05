@@ -6,6 +6,14 @@ export interface RenderOptions {
   autoFrame?: boolean;
 }
 
+
+export interface VideoRenderOptions {
+	duration?: number;    
+	width?: number;
+	height?: number;
+	frameRate?: number;
+}
+
 export interface SchematicMetadata {
   name: string;
   size: number;
