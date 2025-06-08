@@ -105,39 +105,38 @@ export function App() {
 					console.warn("FFmpeg instance exists but is not loaded yet");
 				}
 
-				const renderer = new SchematicRenderer(
-					canvasRef.current,
-					{},
-					{
-						vanillaPack: async () => {
-							console.log("Loading pack.zip...");
-							const response = await fetch("/pack.zip");
-							if (!response.ok) {
-								throw new Error(`Failed to load pack.zip: ${response.status}`);
-							}
-							const buffer = await response.arrayBuffer();
-							console.log("✅ pack.zip loaded, size:", buffer.byteLength);
-							return new Blob([buffer], { type: "application/zip" });
-						},
-					},
-					{
-						ffmpeg: ffmpeg,
-						enableDragAndDrop: true,
-						callbacks: {
-							onRendererInitialized: async (
-								rendererInstance: SchematicRenderer
-							) => {
-								if (!mounted) return;
+const renderer = new SchematicRenderer(
+	canvasRef.current,
+	{},
+	{
+		vanillaPack: async () => {
+			console.log("Loading pack.zip...");
+			const response = await fetch("/pack.zip");
+			if (!response.ok) {
+				throw new Error(`Failed to load pack.zip: ${response.status}`);
+			}
+			const buffer = await response.arrayBuffer();
+			console.log("✅ pack.zip loaded, size:", buffer.byteLength);
+			return new Blob([buffer], { type: "application/zip" });
+		},
+	},
+	{
+		ffmpeg: ffmpeg,
+		enableDragAndDrop: true,
+		callbacks: {
+			onRendererInitialized: async (
+				rendererInstance: SchematicRenderer
+			) => {
+				if (!mounted) return;
+				console.log("✅ SchematicRenderer initialized successfully");
+				rendererRef.current = rendererInstance;
+				setStatus("ready");
 
-								console.log("✅ SchematicRenderer initialized successfully");
-								rendererRef.current = rendererInstance;
-								setStatus("ready");
-
-								window.schematicRendererInitialized = true;
-							},
-						},
-					}
-				);
+				window.schematicRendererInitialized = true;
+			},
+		},
+	}
+);
 
 				rendererRef.current = renderer;
 			} catch (error) {
