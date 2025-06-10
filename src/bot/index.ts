@@ -437,9 +437,9 @@ async function renderSchematicVideoAttachment(message: any, attachment: any) {
 
 		// Set up video render options
 		const videoOptions = {
-			duration: 6,        // 6 second video
-			width: 1920,
-			height: 1080,
+			duration: 5,        // 6 second video
+			width: 1280,      // 1920px width
+			height: 720,       // 1080px height
 			frameRate: 30,      // 30fps for smooth rotation
 		};
 
@@ -465,7 +465,7 @@ async function renderSchematicVideoAttachment(message: any, attachment: any) {
 				{ name: "🎥 Video Size", value: `${outputSizeMB}MB`, inline: true },
 				{ name: "⏱️ Processing Time", value: `${processingTime}s`, inline: true },
 				{ name: "🎞️ Duration", value: `${videoOptions.duration}s`, inline: true },
-				{ name: "📐 Resolution", value: "1920×1080@30fps", inline: true },
+				{ name: "📐 Resolution", value: `${videoOptions.width}×${videoOptions.height}`, inline: true },
 				{ name: "🔄 Animation", value: "360° rotation", inline: true }
 			)
 			.setFooter({ text: "Use !render for static image • !help for more commands" })
@@ -498,7 +498,19 @@ async function renderSchematicVideoAttachment(message: any, attachment: any) {
 		logger.info(`Successfully rendered video for ${attachment.name} in ${processingTime}s`);
 
 	} catch (error: any) {
-		logger.error(`Failed to render video for ${attachment.name}:`, error);
+		// check the lenghth of the error message since it can possible contain the video data
+		if (error.message && error.message.length < 1000) {
+			logger.error(`Failed to render video for ${attachment.name}:`, error);
+		}
+		else {
+			logger.error(`Failed to render video for ${attachment.name}:`, "Error message too long to log");
+			// log some details about the error
+			logger.error(`Error details: ${JSON.stringify({
+				name: error.name,
+				stack: error.stack,
+			})}`);
+
+		}
 
 		// Replace loading reaction with error
 		await message.reactions.removeAll();
