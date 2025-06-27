@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, AttachmentBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
+import { Client, GatewayIntentBits, AttachmentBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, REST, Routes, SlashCommandBuilder, Events, ChatInputCommandInteraction, Attachment, ActivityType, ButtonInteraction } from "discord.js";
 import { logger } from "../shared/logger.js";
 import { renderSchematic, renderSchematicVideo } from "../services/renderer.js";
 
@@ -35,7 +35,7 @@ export async function initDiscordBot(): Promise<void> {
 			
 			// Set bot activity
 			client?.user?.setActivity('Minecraft schematics | !help', { 
-				type: 'WATCHING' as any 
+				type: ActivityType.Watching
 			});
 		});
 
@@ -43,36 +43,24 @@ export async function initDiscordBot(): Promise<void> {
 			logger.error("Discord bot error:", error);
 		});
 
-		// Handle messages and commands
-		client.on("messageCreate", async (message) => {
-			if (message.author.bot) return;
+		client.on(Events.InteractionCreate, async (interaction) => {
+            // Handle slash commands
+            if (interaction.isChatInputCommand()) {
+                try {
+                    await handleCommand(interaction);
+                } catch (error) {
+                    logger.error("Error handling slash command:", error);
+                }
+            }
 
-			try {
-				// Command handling
-				if (message.content.startsWith('!')) {
-					await handleCommand(message);
-					return;
-				}
-
-				// Auto-process schematic attachments (image only)
-				if (message.attachments.size > 0) {
-					await handleSchematicAttachments(message, 'image');
-				}
-			} catch (error) {
-				logger.error("Error handling message:", error);
-				await safeReply(message, "❌ An unexpected error occurred while processing your request.");
-			}
-		});
-
-		// Handle button interactions
-		client.on("interactionCreate", async (interaction) => {
-			if (!interaction.isButton()) return;
-
-			try {
-				await handleButtonInteraction(interaction);
-			} catch (error) {
-				logger.error("Error handling button interaction:", error);
-			}
+            // Handle button interactions
+			if (interaction.isButton()) {
+                try {
+                    await handleButtonInteraction(interaction);
+                } catch (error) {
+                    logger.error("Error handling button interaction:", error);
+                }
+            }
 		});
 
 		await client.login(token);
@@ -85,29 +73,26 @@ export async function initDiscordBot(): Promise<void> {
 /**
  * Handle bot commands
  */
-async function handleCommand(message: any) {
-	const args = message.content.slice(1).trim().split(/ +/);
-	const command = args.shift()?.toLowerCase();
-
-	switch (command) {
+async function handleCommand(interaction:  ChatInputCommandInteraction) {
+	switch (interaction.commandName) {
 		case 'ping':
-			await handlePingCommand(message);
+			await handlePingCommand(interaction);
 			break;
 		case 'help':
-			await handleHelpCommand(message);
+			await handleHelpCommand(interaction);
 			break;
 		case 'render':
-			await handleRenderCommand(message, 'image');
+			await handleRenderCommand(interaction, 'image');
 			break;
 		case 'video':
 		case 'animate':
-			await handleRenderCommand(message, 'video');
+			await handleRenderCommand(interaction, 'video');
 			break;
 		case 'status':
-			await handleStatusCommand(message);
+			await handleStatusCommand(interaction);
 			break;
 		case 'info':
-			await handleInfoCommand(message);
+			await handleInfoCommand(interaction);
 			break;
 		default:
 			// Unknown command - ignore silently
@@ -118,7 +103,7 @@ async function handleCommand(message: any) {
 /**
  * Handle ping command
  */
-async function handlePingCommand(message: any) {
+async function handlePingCommand(interaction: ChatInputCommandInteraction) {
 	const embed = new EmbedBuilder()
 		.setColor(0x00AE86)
 		.setTitle("🏓 Pong!")
@@ -129,13 +114,13 @@ async function handlePingCommand(message: any) {
 		)
 		.setTimestamp();
 
-	await message.reply({ embeds: [embed] });
+	await interaction.reply({ embeds: [embed] });
 }
 
 /**
  * Handle help command
  */
-async function handleHelpCommand(message: any) {
+async function handleHelpCommand(interaction: ChatInputCommandInteraction | ButtonInteraction) {
 	const embed = new EmbedBuilder()
 		.setColor(0x5865F2)
 		.setTitle("🔧 Schemat Bot Commands")
@@ -165,14 +150,16 @@ async function handleHelpCommand(message: any) {
 		.setFooter({ text: "Just drop your schematic file to get started!" })
 		.setTimestamp();
 
-	await message.reply({ embeds: [embed] });
+	await interaction.reply({ embeds: [embed] });
 }
 
 /**
  * Handle render command (image or video)
  */
-async function handleRenderCommand(message: any, type: 'image' | 'video') {
-	if (message.attachments.size === 0) {
+async function handleRenderCommand(interaction: ChatInputCommandInteraction, type: 'image' | 'video') {
+    const attachment = interaction.options.getAttachment("schematic");
+
+	if (attachment == null) {
 		const embed = new EmbedBuilder()
 			.setColor(0xFF6B6B)
 			.setTitle("❌ No File Attached")
@@ -182,20 +169,20 @@ async function handleRenderCommand(message: any, type: 'image' | 'video') {
 				{ name: "Max File Size", value: `${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB`, inline: true }
 			);
 
-		await message.reply({ embeds: [embed] });
+		await interaction.reply({ embeds: [embed] });
 		return;
 	}
 
-	await handleSchematicAttachments(message, type);
+	await handleSchematicAttachments(interaction, [attachment], type);
 }
 
 /**
  * Handle status command
  */
-async function handleStatusCommand(message: any) {
-	const userLimit = rateLimits.get(message.author.id);
+async function handleStatusCommand(interaction: ChatInputCommandInteraction) {
+	const userLimit = rateLimits.get(interaction.user.id);
 	const remainingUses = userLimit ? Math.max(0, RATE_LIMIT_MAX - userLimit.count) : RATE_LIMIT_MAX;
-	const resetTime = userLimit?.resetTime || Date.now();
+	const resetTime = userLimit?.resetTime ?? Date.now();
 	const resetIn = Math.max(0, Math.ceil((resetTime - Date.now()) / 1000 / 60));
 
 	const embed = new EmbedBuilder()
@@ -209,13 +196,13 @@ async function handleStatusCommand(message: any) {
 		.setFooter({ text: `Rate limit: ${RATE_LIMIT_MAX} renders per ${RATE_LIMIT_WINDOW / 60000} minutes` })
 		.setTimestamp();
 
-	await message.reply({ embeds: [embed] });
+	await interaction.reply({ embeds: [embed] });
 }
 
 /**
  * Handle info command
  */
-async function handleInfoCommand(message: any) {
+async function handleInfoCommand(interaction: ChatInputCommandInteraction) {
 	const embed = new EmbedBuilder()
 		.setColor(0x8B5CF6)
 		.setTitle("🔍 Technical Information")
@@ -233,7 +220,7 @@ async function handleInfoCommand(message: any) {
 		.setFooter({ text: "Built with ❤️ for the Minecraft community" })
 		.setTimestamp();
 
-	await message.reply({ embeds: [embed] });
+	await interaction.reply({ embeds: [embed] });
 }
 
 /**
@@ -271,7 +258,7 @@ function getRateLimitReset(userId: string): number {
 /**
  * Validate schematic file
  */
-function validateSchematicFile(attachment: any): string | null {
+function validateSchematicFile(attachment: Attachment): string | null {
 	// Check file extension
 	const fileName = attachment.name.toLowerCase();
 	const isSupported = SUPPORTED_FORMATS.some(format => fileName.endsWith(format));
@@ -291,10 +278,10 @@ function validateSchematicFile(attachment: any): string | null {
 /**
  * Handle message attachments and render schematics
  */
-async function handleSchematicAttachments(message: any, type: 'image' | 'video') {
-	// Check rate limit first
-	if (!checkRateLimit(message.author.id)) {
-		const resetTime = getRateLimitReset(message.author.id);
+async function handleSchematicAttachments(interaction: ChatInputCommandInteraction, schematics: Attachment[], type: 'image' | 'video') {
+    // Check rate limit first
+	if (!checkRateLimit(interaction.user.id)) {
+		const resetTime = getRateLimitReset(interaction.user.id);
 		const embed = new EmbedBuilder()
 			.setColor(0xFF6B6B)
 			.setTitle("⏰ Rate Limited")
@@ -304,25 +291,21 @@ async function handleSchematicAttachments(message: any, type: 'image' | 'video')
 				{ name: "Reset Time", value: `${resetTime} minutes`, inline: true }
 			);
 
-		await message.reply({ embeds: [embed] });
+		await interaction.reply({ embeds: [embed] });
 		return;
 	}
 
-	const schematicAttachments = message.attachments.filter((attachment: any) => {
-		return validateSchematicFile(attachment) === null;
-	});
-
-	if (schematicAttachments.size === 0) {
+	if (schematics.length === 0) {
 		// no errors, it's probably not a schematic file and we can ignore it
 		return;
 	}
 
 	// Process each valid attachment
-	for (const [, attachment] of schematicAttachments) {
+	for (const attachment of schematics) {
 		if (type === 'video') {
-			await renderSchematicVideoAttachment(message, attachment);
+			await renderSchematicVideoAttachment(interaction, attachment);
 		} else {
-			await renderSchematicImageAttachment(message, attachment);
+			await renderSchematicImageAttachment(interaction, attachment);
 		}
 	}
 }
@@ -330,12 +313,12 @@ async function handleSchematicAttachments(message: any, type: 'image' | 'video')
 /**
  * Download and render a single schematic attachment as image
  */
-async function renderSchematicImageAttachment(message: any, attachment: any) {
+async function renderSchematicImageAttachment(interaction: ChatInputCommandInteraction, attachment: Attachment) {
 	const startTime = Date.now();
 
 	try {
-		// Send initial reaction to show we're processing
-		await message.react("📸");
+		// Show we're processing
+		await interaction.deferReply();
 
 		logger.info(`Processing image: ${attachment.name} (${attachment.size} bytes)`);
 
@@ -381,23 +364,15 @@ async function renderSchematicImageAttachment(message: any, attachment: any) {
 			.setTimestamp();
 
 		// Send the rendered image
-		await message.reply({
+		await interaction.editReply({
 			embeds: [embed],
 			files: [imageAttachment],
 		});
-
-		// Replace loading reaction with success
-		await message.reactions.removeAll();
-		await message.react("✅");
 
 		logger.info(`Successfully rendered image for ${attachment.name} in ${processingTime}s`);
 
 	} catch (error: any) {
 		logger.error(`Failed to render image for ${attachment.name}:`, error);
-
-		// Replace loading reaction with error
-		await message.reactions.removeAll();
-		await message.react("❌");
 
 		// Send error embed
 		const errorEmbed = new EmbedBuilder()
@@ -405,25 +380,25 @@ async function renderSchematicImageAttachment(message: any, attachment: any) {
 			.setTitle("❌ Render Failed")
 			.setDescription(`Failed to render **${attachment.name}**`)
 			.addFields(
-				{ name: "Error", value: error.message || "Unknown error", inline: false },
+				{ name: "Error", value: error.message ?? "Unknown error", inline: false },
 				{ name: "Supported Formats", value: SUPPORTED_FORMATS.join(', '), inline: true },
 				{ name: "Need Help?", value: "Use `!help` for assistance", inline: true }
 			)
 			.setTimestamp();
 
-		await message.reply({ embeds: [errorEmbed] });
+		await interaction.editReply({ embeds: [errorEmbed] });
 	}
 }
 
 /**
  * Download and render a single schematic attachment as video
  */
-async function renderSchematicVideoAttachment(message: any, attachment: any) {
+async function renderSchematicVideoAttachment(interaction: ChatInputCommandInteraction, attachment: Attachment) {
 	const startTime = Date.now();
 
 	try {
-		// Send initial reaction to show we're processing
-		await message.react("🎬");
+		// Show we're processing
+		await interaction.deferReply();
 
 		logger.info(`Processing video: ${attachment.name} (${attachment.size} bytes)`);
 
@@ -485,15 +460,11 @@ async function renderSchematicVideoAttachment(message: any, attachment: any) {
 			);
 
 		// Send the rendered video
-		await message.reply({
+		await interaction.editReply({
 			embeds: [embed],
 			files: [videoAttachment],
 			components: [row],
 		});
-
-		// Replace loading reaction with success
-		await message.reactions.removeAll();
-		await message.react("✅");
 
 		logger.info(`Successfully rendered video for ${attachment.name} in ${processingTime}s`);
 
@@ -512,30 +483,26 @@ async function renderSchematicVideoAttachment(message: any, attachment: any) {
 
 		}
 
-		// Replace loading reaction with error
-		await message.reactions.removeAll();
-		await message.react("❌");
-
 		// Send error embed
 		const errorEmbed = new EmbedBuilder()
 			.setColor(0xFF6B6B)
 			.setTitle("❌ Video Render Failed")
 			.setDescription(`Failed to create animation for **${attachment.name}**`)
 			.addFields(
-				{ name: "Error", value: error.message || "Unknown error", inline: false },
+				{ name: "Error", value: error.message ?? "Unknown error", inline: false },
 				{ name: "Try Instead", value: "Use `!render` for a static image", inline: true },
 				{ name: "Need Help?", value: "Use `!help` for assistance", inline: true }
 			)
 			.setTimestamp();
 
-		await message.reply({ embeds: [errorEmbed] });
+		await interaction.editReply({ embeds: [errorEmbed] });
 	}
 }
 
 /**
  * Handle button interactions
  */
-async function handleButtonInteraction(interaction: any) {
+async function handleButtonInteraction(interaction: ButtonInteraction) {
 	if (interaction.customId === 'help_commands') {
 		await handleHelpCommand(interaction);
 	}
@@ -543,19 +510,75 @@ async function handleButtonInteraction(interaction: any) {
 }
 
 /**
- * Safe reply that handles both messages and interactions
+ * List of all the slash commands
  */
-async function safeReply(messageOrInteraction: any, content: string | object) {
+const commands = [
+    new SlashCommandBuilder()
+		.setName('ping')
+		.setDescription('Replies with Pong!')
+        .toJSON(),
+    
+    new SlashCommandBuilder()
+        .setName('help')
+        .setDescription('Sends help on how to use the bot')
+        .toJSON(),
+
+    new SlashCommandBuilder()
+        .setName('render')
+        .setDescription('Generates a render of a schematic.')
+        .addAttachmentOption((option) => option
+            .setName("schematic")
+            .setDescription("The schematic to render")
+            .setRequired(true)
+        )
+        .toJSON(),
+
+    new SlashCommandBuilder()
+        .setName('video')
+        .setDescription('Generates a spinning render of a schematic')
+        .addAttachmentOption((option) => option
+            .setName("schematic")
+            .setDescription("The schematic to render")
+            .setRequired(true)
+        )
+        .toJSON(),
+
+    new SlashCommandBuilder()
+        .setName('status')
+        .setDescription('Check your render quota and more')
+        .toJSON(),
+
+    new SlashCommandBuilder()
+        .setName('info')
+        .setDescription('See technical specifications')
+        .toJSON(),
+];
+
+async function syncCommands() {
+	const token = process.env.DISCORD_TOKEN;
+	const clientId = process.env.DISCORD_CLIENT_ID;
+
+    if (!token || !clientId) {
+		logger.warn("Discord token or client ID not provided, skipping commands synchronization");
+		return;
+    }
+
+	const rest = new REST().setToken(token);
+
 	try {
-		if (messageOrInteraction.replied || messageOrInteraction.deferred) {
-			await messageOrInteraction.followUp(content);
-		} else if (messageOrInteraction.reply) {
-			await messageOrInteraction.reply(content);
-		}
+		const data = await rest.put(
+			Routes.applicationCommands(clientId),
+			{ body: commands },
+		);
+
+        if (Array.isArray(data)) {
+            logger.info(`Successfully synchronized ${data.length} commands.`);
+        }
 	} catch (error) {
-		logger.error("Failed to send reply:", error);
+		console.error(error);
 	}
 }
+syncCommands();
 
 export function getDiscordClient(): Client | null {
 	return client;
