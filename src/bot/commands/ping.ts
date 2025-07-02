@@ -4,8 +4,7 @@ import { ICommand } from "../command";
 export default class Ping implements ICommand {
     info = new SlashCommandBuilder()
         .setName("ping")
-        .setDescription("Checks your ping")
-        .toJSON();
+        .setDescription("Checks your ping");
 
     async handle(interaction: ChatInputCommandInteraction) {
         const response = await interaction.reply({content: "🏓 Pong!", withResponse: true, flags: MessageFlags.Ephemeral});

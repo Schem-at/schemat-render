@@ -75,7 +75,11 @@ async function handleCommand(interaction: ChatInputCommandInteraction) {
                 flags: MessageFlags.Ephemeral
             });
         } else {
-            await command.handle(interaction);
+            try {
+                await command.handle(interaction);
+            } catch (error) {
+                logger.error("Failed to handle command", error);
+            }
         }
     } catch (error) {
         logger.error("Error handling slash command:", error);
@@ -97,7 +101,7 @@ async function syncCommands() {
         const rest = new REST().setToken(token);
 		const data = await rest.put(
 			Routes.applicationCommands(clientId),
-			{ body: commands.map(cmd => cmd.info) },
+			{ body: commands.map(cmd => cmd.info.toJSON()) },
 		);
 
         if (Array.isArray(data)) {

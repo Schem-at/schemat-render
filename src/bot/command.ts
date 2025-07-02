@@ -1,11 +1,11 @@
-import { ChatInputCommandInteraction, RESTPostAPIApplicationCommandsJSONBody } from "discord.js";
+import { ChatInputCommandInteraction, SlashCommandBuilder, SlashCommandOptionsOnlyBuilder } from "discord.js";
 import fs from "fs";
 import path from "path";
 
 export const commands: ICommand[] = new Array();
 
 export interface ICommand {
-    readonly info: RESTPostAPIApplicationCommandsJSONBody;
+    readonly info: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder;
     handle(interaction: ChatInputCommandInteraction): Promise<void>;
 }
 
