@@ -1,11 +1,11 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder, SlashCommandOptionsOnlyBuilder } from "discord.js";
+import { ChatInputCommandInteraction, SharedSlashCommand, SlashCommandBuilder } from "discord.js";
 import fs from "fs";
 import path from "path";
 
 export const commands: ICommand[] = new Array();
 
 export interface ICommand {
-    readonly info: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder;
+    readonly info: SlashCommandBuilder | SharedSlashCommand;
     handle(interaction: ChatInputCommandInteraction): Promise<void>;
 }
 

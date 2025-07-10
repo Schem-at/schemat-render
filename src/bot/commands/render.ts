@@ -11,21 +11,29 @@ export default class Render implements ICommand {
     info = new SlashCommandBuilder()
         .setName("render")
         .setDescription("Generates a render of a schematic")
-        .addAttachmentOption((option) => option
-            .setName("schematic")
-            .setDescription("The schematic to render")
-            .setRequired(true)
+        .addSubcommand((subcommand) => subcommand
+            .setName("image")
+            .setDescription("Generates a still picture")
+            .addAttachmentOption((option) => option
+                .setName("schematic")
+                .setDescription("The schematic to render")
+                .setRequired(true)
+            )
         )
-        .addBooleanOption((option) => option
+        .addSubcommand((subcommand) => subcommand
             .setName("video")
-            .setDescription("Whether to take a still picture (default) or a spinning video")
-            .setRequired(false)
+            .setDescription("Generates a 360° video")
+            .addAttachmentOption((option) => option
+                .setName("schematic")
+                .setDescription("The schematic to render")
+                .setRequired(true)
+            )
         );
 
     async handle(interaction: ChatInputCommandInteraction) {
         // Options
         const attachment = interaction.options.getAttachment("schematic");
-        const videoMode = interaction.options.getBoolean("video");
+        const videoMode = interaction.options.getSubcommand() == "video";
 
         // Check schematic existance
         if (attachment == null) {
