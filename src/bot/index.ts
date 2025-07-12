@@ -1,6 +1,6 @@
-import { Client, GatewayIntentBits, REST, Routes, Events, ActivityType, ApplicationCommand, ChatInputCommandInteraction, MessageFlags } from "discord.js";
+import { Client, GatewayIntentBits, REST, Routes, Events, ActivityType, ChatInputCommandInteraction, MessageFlags, UserContextMenuCommandInteraction, MessageContextMenuCommandInteraction } from "discord.js";
 import { logger } from "../shared/logger.js";
-import { commands, registerCommands } from "./command.js";
+import { commands, menus, registerCommands } from "./command.js";
 
 let client: Client | null = null;
 
@@ -49,6 +49,11 @@ export async function initDiscordBot(): Promise<void> {
                 handleCommand(interaction);
             }
 
+            // Handle context menus
+            if (interaction.isUserContextMenuCommand() || interaction.isMessageContextMenuCommand()) {
+                handleMenu(interaction);
+            }
+
             // Handle button interactions
 			if (interaction.isButton()) {
                 try {
@@ -86,6 +91,26 @@ async function handleCommand(interaction: ChatInputCommandInteraction) {
     }
 }
 
+async function handleMenu(interaction: UserContextMenuCommandInteraction | MessageContextMenuCommandInteraction) {
+    try {
+        const menu = menus.find(cmd => cmd.info.name == interaction.commandName);
+        if (menu == null) {
+            await interaction.reply({
+                content: `❌ Error: Command \`${interaction.commandName}\` not found.`,
+                flags: MessageFlags.Ephemeral
+            });
+        } else {
+            try {
+                await menu.handle(interaction);
+            } catch (error) {
+                logger.error("Failed to handle command", error);
+            }
+        }
+    } catch (error) {
+        logger.error("Error handling slash command:", error);
+    }
+}
+
 async function syncCommands() {
 	const token = process.env.DISCORD_TOKEN;
 	const clientId = process.env.DISCORD_CLIENT_ID;
@@ -98,15 +123,17 @@ async function syncCommands() {
     registerCommands();
     
 	try {
+        const merged = [...commands, ...menus];
+
         const rest = new REST().setToken(token);
 		const data = await rest.put(
 			Routes.applicationCommands(clientId),
-			{ body: commands.map(cmd => cmd.info.toJSON()) },
+			{ body: merged.map(cmd => cmd.info.toJSON()) },
 		);
 
         if (Array.isArray(data)) {
             const names = data.map(cmd => cmd.name).join(", ");
-            logger.info(`Successfully synchronized ${data.length} commands: ${names}`);
+            logger.info(`Successfully synchronized ${data.length} commands & menus: ${names}`);
         }
 	} catch (error) {
 		console.error(error);
