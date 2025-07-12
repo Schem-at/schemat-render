@@ -1,6 +1,6 @@
-import { Client, GatewayIntentBits, REST, Routes, Events, ActivityType, ChatInputCommandInteraction, MessageFlags, UserContextMenuCommandInteraction, MessageContextMenuCommandInteraction } from "discord.js";
+import { Client, GatewayIntentBits, Events, ActivityType, ChatInputCommandInteraction, MessageFlags, UserContextMenuCommandInteraction, MessageContextMenuCommandInteraction } from "discord.js";
 import { logger } from "../shared/logger.js";
-import { commands, menus, registerCommands } from "./command.js";
+import { commands, menus, syncCommands } from "./command.js";
 
 let client: Client | null = null;
 
@@ -64,6 +64,9 @@ export async function initDiscordBot(): Promise<void> {
             }
 		});
 
+        // Ensure we have a way to sync the commands for new deployments
+        syncCommands([]);
+
 		await client.login(token);
 	} catch (error) {
 		logger.error("Failed to initialize Discord bot:", error);
@@ -110,33 +113,3 @@ async function handleMenu(interaction: UserContextMenuCommandInteraction | Messa
         logger.error("Error handling slash command:", error);
     }
 }
-
-async function syncCommands() {
-	const token = process.env.DISCORD_TOKEN;
-	const clientId = process.env.DISCORD_CLIENT_ID;
-
-    if (!token || !clientId) {
-		logger.warn("Discord token or client ID not provided, skipping commands synchronization");
-		return;
-    }
-
-    registerCommands();
-    
-	try {
-        const merged = [...commands, ...menus];
-
-        const rest = new REST().setToken(token);
-		const data = await rest.put(
-			Routes.applicationCommands(clientId),
-			{ body: merged.map(cmd => cmd.info.toJSON()) },
-		);
-
-        if (Array.isArray(data)) {
-            const names = data.map(cmd => cmd.name).join(", ");
-            logger.info(`Successfully synchronized ${data.length} commands & menus: ${names}`);
-        }
-	} catch (error) {
-		console.error(error);
-	}
-}
-syncCommands();
