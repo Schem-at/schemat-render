@@ -1,4 +1,4 @@
-import { APIEmbedField, ChatInputCommandInteraction, EmbedBuilder, MessageFlags, SlashCommandBuilder, SlashCommandOptionsOnlyBuilder } from "discord.js";
+import { APIEmbedField, ChatInputCommandInteraction, EmbedBuilder, MessageFlags, SharedSlashCommand, SlashCommandBuilder } from "discord.js";
 import { commands, ICommand } from "../command";
 
 export default class Help implements ICommand {
@@ -19,7 +19,7 @@ export default class Help implements ICommand {
     }
 }
 
-function getUsage(builder: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder): string {
+function getUsage(builder: SlashCommandBuilder | SharedSlashCommand): string {
     let usage = '/' + builder.name;
 
     for (const ioption of builder.options) {
@@ -30,7 +30,7 @@ function getUsage(builder: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder)
     return usage;
 }
 
-function getParameters(builder: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder): APIEmbedField[] {
+function getParameters(builder: SlashCommandBuilder | SharedSlashCommand): APIEmbedField[] {
     return builder.options.map(ioption => {
         const option = ioption.toJSON();
         return {
