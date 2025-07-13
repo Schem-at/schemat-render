@@ -50,7 +50,7 @@ export default class Render implements ICommand {
                 // TODO: Add a button to lower the settings
             } else {
                 logger.error(`Failed to render schematic "${attachment!.name}":`, error);
-                await interaction.editReply({ content: `❌ An error occured:` });
+                await interaction.editReply({ content: `❌ An error occurred:` });
             }
         }
     }
