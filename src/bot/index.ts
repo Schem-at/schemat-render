@@ -1,6 +1,6 @@
 import { Client, GatewayIntentBits, Events, ActivityType, ChatInputCommandInteraction, MessageFlags, UserContextMenuCommandInteraction, MessageContextMenuCommandInteraction } from "discord.js";
 import { logger } from "../shared/logger.js";
-import { commands, menus, syncCommands } from "./command.js";
+import { commands, menus, registerCommands, syncCommands } from "./command.js";
 
 let client: Client | null = null;
 
@@ -64,8 +64,9 @@ export async function initDiscordBot(): Promise<void> {
             }
 		});
 
-        // Ensure we have a way to sync the commands for new deployments
-        syncCommands([]);
+        // Update the commands
+        registerCommands();
+        syncCommands();
 
 		await client.login(token);
 	} catch (error) {

@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction, ContextMenuCommandBuilder, MessageContextMenuCommandInteraction, REST, Routes, SharedSlashCommand, SlashCommandBuilder, UserContextMenuCommandInteraction } from "discord.js";
+import { ChatInputCommandInteraction, ContextMenuCommandBuilder, MessageContextMenuCommandInteraction, REST, RESTGetAPIApplicationCommandsResult, Routes, SharedSlashCommand, SlashCommandBuilder, UserContextMenuCommandInteraction } from "discord.js";
 import fs from "fs";
 import path from "path";
 import { logger } from "../shared/logger";
@@ -47,7 +47,7 @@ export function registerCommands() {
     return [...commands, ...menus];
 }
 
-export async function syncCommands(commands_: (ICommand | IMenuCommand)[]) {
+export async function syncCommands() {
 	const token = process.env.DISCORD_TOKEN;
 	const clientId = process.env.DISCORD_CLIENT_ID;
 
@@ -57,25 +57,22 @@ export async function syncCommands(commands_: (ICommand | IMenuCommand)[]) {
     }
 
     // Ensure we have the reload command
-    let reload = commands.find(cmd => cmd instanceof Reload);
-    if (reload == undefined) {
-        reload = new Reload();
-        commands.push(reload);
-    }
-    if (commands_.length == 0)
-        commands_ = [reload];
+    if (!commands.some(cmd => cmd instanceof Reload))
+        commands.push(new Reload());
+
+    const applications = [...commands, ...menus];
     
 	try {
         const rest = new REST().setToken(token);
-		const data = await rest.put(
-			Routes.applicationCommands(clientId),
-			{ body: commands_.map(cmd => cmd.info.toJSON()) },
-		);
+        const route = Routes.applicationCommands(clientId);
 
-        if (Array.isArray(data)) {
-            const names = data.map(cmd => cmd.name).join(", ");
-            logger.info(`Successfully synchronized ${data.length} commands & menus: ${names}`);
-        }
+        // Bulk override of the apps
+        // https://discord.com/developers/docs/interactions/application-commands#bulk-overwrite-global-application-commands
+        const data = applications.map(app => app.info.toJSON());
+		const response = await rest.put(route, { body: data }) as RESTGetAPIApplicationCommandsResult;
+
+        const names = response.map(app => app.name).join(", ");
+        logger.info(`Successfully synchronized ${response.length} commands & menus: ${names}`);
 	} catch (error) {
 		console.error(error);
 	}

@@ -4,7 +4,7 @@ import { ICommand, registerCommands, syncCommands } from "../command";
 export default class Reload implements ICommand {
     info = new SlashCommandBuilder()
         .setName("reload")
-        .setDescription("Register new commands and reload the bot")
+        .setDescription("Register new commands and reload the bot. Will overwrite ALL applications.")
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
     async handle(interaction: ChatInputCommandInteraction) {
@@ -15,7 +15,8 @@ export default class Reload implements ICommand {
             return;
         }
 
-        syncCommands(registerCommands());
+        registerCommands();
+        syncCommands();
 
         await interaction.reply({ content: "Commands synchronized. You will be able to use them shortly.\nReload Discord to refresh them.", flags: MessageFlags.Ephemeral });
     }
