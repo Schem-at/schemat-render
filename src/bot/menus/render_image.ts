@@ -14,8 +14,10 @@ export default class RenderImage implements IMenuCommand {
         const attachment = attachments.find(attachment => checkError(attachment) == null);
 
         // Pre-checking
-        if (attachment == undefined)
+        if (attachment == undefined) {
             await interaction.reply({content: "❌ no valid attachment found on this message", flags: MessageFlags.Ephemeral});
+            return;
+        }
 
         // Let the user know this will take a while
         await interaction.deferReply();
