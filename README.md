@@ -14,7 +14,7 @@ A unified service for rendering Minecraft schematics, featuring:
 bun install
 
 # Setup project
-./scripts/setup.sh
+bun run setup-libs
 
 # Configure environment
 cp .env.example .env
