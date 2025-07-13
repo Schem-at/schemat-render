@@ -29,7 +29,7 @@ export default class RenderVideo implements IMenuCommand {
                 await interaction.editReply({ content: "⌛ Render took too long. Aborted." });
             } else {
                 logger.error(`Failed to render schematic "${attachment!.name}":`, error);
-                await interaction.editReply({ content: `❌ An error occured:` });
+                await interaction.editReply({ content: `❌ An error occurred:` });
             }
         }
     }
