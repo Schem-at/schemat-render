@@ -1,4 +1,4 @@
-import { APIEmbedField, ChatInputCommandInteraction, EmbedBuilder, MessageFlags, SharedSlashCommand, SlashCommandBuilder } from "discord.js";
+import { APIEmbedField, ChatInputCommandInteraction, EmbedBuilder, GuildMember, MessageFlags, PermissionResolvable, SharedSlashCommand, SlashCommandBuilder } from "discord.js";
 import { commands, ICommand } from "../command";
 
 export default class Help implements ICommand {
@@ -7,13 +7,15 @@ export default class Help implements ICommand {
         .setDescription("How to use the bot");
 
     async handle(interaction: ChatInputCommandInteraction) {
-        const embeds = commands.map(command => 
-            new EmbedBuilder()
-                .setTitle(getUsage(command.info))
-                .setDescription(command.info.description)
-                .addFields(getParameters(command.info))
-                .setColor("#ff0000")
-        );
+        const embeds = commands
+            .filter(command => hasPermission(command.info.default_member_permissions, interaction.member as (GuildMember | null)))
+            .map(command => 
+                new EmbedBuilder()
+                    .setTitle(getUsage(command.info))
+                    .setDescription(command.info.description)
+                    .addFields(getParameters(command.info))
+                    .setColor("#ff0000")
+            );
 
         await interaction.reply({embeds: embeds, flags: MessageFlags.Ephemeral});
     }
@@ -39,4 +41,8 @@ function getParameters(builder: SlashCommandBuilder | SharedSlashCommand): APIEm
             inline: true,
         };
     });
+}
+
+function hasPermission(permissions: string | null | undefined, member: GuildMember | null) {
+    return !permissions || member?.permissions.has(permissions as PermissionResolvable);
 }
