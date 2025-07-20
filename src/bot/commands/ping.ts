@@ -2,15 +2,15 @@ import { ChatInputCommandInteraction, MessageFlags, SlashCommandBuilder } from "
 import { ICommand } from "../command";
 
 export default class Ping implements ICommand {
-    info = new SlashCommandBuilder()
-        .setName("ping")
-        .setDescription("Checks your ping");
+	info = new SlashCommandBuilder()
+		.setName("ping")
+		.setDescription("Checks your ping");
 
-    async handle(interaction: ChatInputCommandInteraction) {
-        const response = await interaction.reply({content: "🏓 Pong!", withResponse: true, flags: MessageFlags.Ephemeral});
-        if (response.resource?.message != null) {
-            const dt = response.resource.message.createdTimestamp - interaction.createdTimestamp;
-            await interaction.editReply(`🏓 Pong in ${dt}ms!`);
-        }
-    }
+	async handle(interaction: ChatInputCommandInteraction) {
+		const response = await interaction.reply({content: "🏓 Pong!", withResponse: true, flags: MessageFlags.Ephemeral});
+		if (response.resource?.message != null) {
+			const dt = response.resource.message.createdTimestamp - interaction.createdTimestamp;
+			await interaction.editReply(`🏓 Pong in ${dt}ms!`);
+		}
+	}
 }
