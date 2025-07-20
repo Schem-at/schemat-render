@@ -14,8 +14,10 @@ export default class RenderImage implements IMenuCommand {
         const attachment = attachments.find(attachment => checkError(attachment) == null);
 
         // Pre-checking
-        if (attachment == undefined)
+        if (attachment == undefined) {
             await interaction.reply({content: "❌ no valid attachment found on this message", flags: MessageFlags.Ephemeral});
+            return;
+        }
 
         // Let the user know this will take a while
         await interaction.deferReply();
@@ -29,7 +31,7 @@ export default class RenderImage implements IMenuCommand {
                 await interaction.editReply({ content: "⌛ Render took too long. Aborted." });
             } else {
                 logger.error(`Failed to render schematic "${attachment!.name}":`, error);
-                await interaction.editReply({ content: `❌ An error occured:` });
+                await interaction.editReply({ content: `❌ An error occurred:` });
             }
         }
     }

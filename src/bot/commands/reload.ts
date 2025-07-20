@@ -11,7 +11,7 @@ export default class Reload implements ICommand {
         // Check for permissions
         const member = interaction.member;
         if (!(member instanceof GuildMember && member.permissions.has(PermissionFlagsBits.Administrator))) {
-            await interaction.reply({ content: "❌ You do not have sufficient permissions to run this commands.", flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: "❌ You do not have sufficient permissions to run this command.", flags: MessageFlags.Ephemeral });
             return;
         }
 
